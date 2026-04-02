@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>ChargeMate — ค้นหาจุดชาร์จ EV</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --g:#00C896;--gd:#00A07A;--gp:#E6FBF5;
+  --ink:#0D1117;--ink2:#1C2333;--ink3:#2D3748;
+  --mu:#64748B;--mu2:#94A3B8;--mu3:#CBD5E1;
+  --s:#F8FAFC;--s2:#F1F5F9;--s3:#E2E8F0;
+  --w:#FFFFFF;--am:#F59E0B;--rd:#EF4444;--bl:#3B82F6;
+  --r8:8px;--r12:12px;--r16:16px;--r24:24px;
+  --sh:0 1px 3px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.06);
+  --shl:0 4px 24px rgba(0,0,0,.12),0 16px 48px rgba(0,0,0,.08);
+  --sidebar:240px;--topbar:56px;--bottom-nav:60px;
+}
+html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--ink2);color:var(--ink);overflow:hidden}
+.app{display:flex;height:100vh;width:100vw;overflow:hidden}
+
+/* ── Sidebar (desktop) ── */
+.sidebar{width:var(--sidebar);flex-shrink:0;background:var(--ink2);display:flex;flex-direction:column;border-right:1px solid rgba(255,255,255,.06);transition:transform .3s}
+.sb-logo{padding:20px 18px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
+.sb-brand{display:flex;align-items:center;gap:10px}
+.sb-bolt{width:34px;height:34px;background:var(--g);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sb-bolt svg{width:18px;height:18px}
+.sb-name{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:#fff;letter-spacing:-.2px}
+.sb-role{font-size:10px;color:rgba(255,255,255,.35);margin-top:1px;background:rgba(0,200,150,.15);color:var(--g);padding:1px 7px;border-radius:20px;display:inline-block;font-weight:600}
+.sb-nav{padding:14px 10px;flex:1;overflow-y:auto}
+.nav-sec{font-size:10px;font-weight:600;color:rgba(255,255,255,.25);letter-spacing:.08em;padding:0 8px;margin:14px 0 5px;text-transform:uppercase}
+.nav-sec:first-child{margin-top:0}
+.ni{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r8);cursor:pointer;color:rgba(255,255,255,.45);font-size:13px;font-weight:500;transition:all .15s;margin-bottom:1px;border:none;background:none;width:100%;text-align:left}
+.ni:hover{background:rgba(255,255,255,.06);color:rgba(255,255,255,.85)}
+.ni.active{background:rgba(0,200,150,.14);color:var(--g)}
+.ni svg{width:16px;height:16px;flex-shrink:0}
+.ni-badge{margin-left:auto;background:var(--g);color:var(--ink);font-size:10px;font-weight:700;padding:1px 6px;border-radius:20px}
+.sb-footer{padding:12px 10px;border-top:1px solid rgba(255,255,255,.07)}
+.user-row{display:flex;align-items:center;gap:10px;padding:8px;border-radius:var(--r8);cursor:pointer;transition:background .15s}
+.user-row:hover{background:rgba(255,255,255,.05)}
+.u-av{width:32px;height:32px;border-radius:50%;background:var(--gp);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--gd);flex-shrink:0}
+.u-name{font-size:12px;font-weight:500;color:rgba(255,255,255,.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.u-sub{font-size:10px;color:rgba(255,255,255,.3)}
+.sb-host-link{margin:8px 10px 0;padding:9px 10px;border-radius:var(--r8);background:rgba(0,200,150,.1);border:1px solid rgba(0,200,150,.2);display:flex;align-items:center;gap:8px;cursor:pointer;text-decoration:none;transition:all .15s}
+.sb-host-link:hover{background:rgba(0,200,150,.18)}
+.sb-host-link span{font-size:12px;font-weight:600;color:var(--g)}
+.sb-host-link svg{width:14px;height:14px;color:var(--g);flex-shrink:0}
+
+/* ── Main ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--s);min-width:0}
+.topbar{height:var(--topbar);background:var(--w);border-bottom:1px solid var(--s3);display:flex;align-items:center;padding:0 18px;gap:12px;flex-shrink:0;z-index:10}
+.topbar-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--ink);flex:1}
+.menu-btn{display:none;width:34px;height:34px;border-radius:var(--r8);border:1px solid var(--s3);background:var(--w);align-items:center;justify-content:center;cursor:pointer;color:var(--mu);flex-shrink:0}
+.tb-tabs{display:flex;gap:3px;background:var(--s2);border-radius:var(--r8);padding:3px}
+.ttab{padding:5px 12px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;color:var(--mu);transition:all .15s;border:none;background:transparent;font-family:'DM Sans',sans-serif}
+.ttab.active{background:var(--w);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.ib{width:34px;height:34px;border-radius:var(--r8);border:1px solid var(--s3);background:var(--w);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--mu);transition:all .15s;position:relative;flex-shrink:0}
+.ib:hover{border-color:var(--g);color:var(--g)}
+.ndot{position:absolute;top:6px;right:6px;width:6px;height:6px;background:var(--rd);border-radius:50%;border:1.5px solid var(--w)}
+
+.content{flex:1;overflow:hidden;display:flex;flex-direction:column}
+
+/* ── Pages ── */
+.page{display:none;flex:1;overflow:hidden}
+.page.active{display:flex;flex-direction:column}
+
+/* ── MAP PAGE ── */
+.map-wrap{display:flex;flex:1;overflow:hidden;position:relative}
+.map-panel{flex:1;position:relative;overflow:hidden;min-width:0}
+#lmap{position:absolute;inset:0;width:100%;height:100%;z-index:0}
+
+/* Leaflet overrides */
+.leaflet-control-zoom{border:none!important;box-shadow:var(--sh)!important;border-radius:var(--r8)!important;overflow:hidden}
+.leaflet-control-zoom a{width:34px!important;height:34px!important;line-height:34px!important;color:var(--ink)!important;background:var(--w)!important;border:none!important;border-bottom:1px solid var(--s3)!important;font-size:16px!important}
+.leaflet-control-zoom a:hover{background:var(--s2)!important}
+.leaflet-control-zoom-out{border-bottom:none!important}
+.leaflet-popup-content-wrapper{border-radius:var(--r12)!important;box-shadow:var(--shl)!important;border:1px solid var(--s3)!important;padding:0!important;overflow:hidden}
+.leaflet-popup-content{margin:0!important;width:230px!important}
+.leaflet-popup-tip-container{display:none}
+.leaflet-control-attribution{font-size:9px!important;background:rgba(255,255,255,.8)!important}
+
+/* Search bar */
+.fbar{position:absolute;top:12px;left:12px;right:12px;z-index:500;display:flex;gap:8px;align-items:center}
+.fwrap{flex:1;position:relative}
+.fwrap svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--mu2);pointer-events:none}
+.finput{width:100%;height:44px;background:var(--w);border-radius:var(--r24);border:none;padding:0 14px 0 42px;font-size:13px;font-family:'DM Sans',sans-serif;box-shadow:0 2px 20px rgba(0,0,0,.15);outline:none;color:var(--ink)}
+.finput:focus{box-shadow:0 2px 20px rgba(0,200,150,.2)}
+.fchip{height:44px;padding:0 14px;background:var(--w);border-radius:var(--r24);border:none;font-size:12px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.1);color:var(--ink);white-space:nowrap;display:flex;align-items:center;gap:5px;transition:all .15s;flex-shrink:0}
+.fchip.on{background:var(--g);color:#fff}
+.fchip:hover:not(.on){background:var(--s2)}
+
+/* Map controls */
+.map-legend{position:absolute;bottom:20px;left:12px;background:rgba(255,255,255,.95);border-radius:var(--r12);padding:8px 12px;display:flex;gap:12px;font-size:11px;box-shadow:var(--sh);z-index:400;backdrop-filter:blur(4px)}
+.leg{display:flex;align-items:center;gap:5px;color:var(--ink3)}
+.ld{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.locate-btn{position:absolute;bottom:20px;right:12px;z-index:400;width:40px;height:40px;background:var(--w);border-radius:var(--r8);border:none;box-shadow:var(--sh);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--mu);transition:all .15s}
+.locate-btn:hover{color:var(--bl)}
+
+/* Direction panel */
+.dir-panel{width:300px;flex-shrink:0;display:flex;flex-direction:column;border-left:1px solid var(--s3);background:var(--w);overflow:hidden;transition:width .25s}
+.dir-panel.hidden{width:0;border:none}
+.dp-hd{padding:14px 14px 10px;border-bottom:1px solid var(--s3);flex-shrink:0}
+.dp-dest{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.dp-close{background:none;border:none;cursor:pointer;color:var(--mu);font-size:18px;line-height:1;padding:0}
+.dp-info{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.dp-badge{background:var(--g);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap}
+.dp-time-label{font-size:13px;font-weight:600;color:var(--ink)}
+.dp-via{font-size:11px;color:var(--mu)}
+.dp-steps{flex:1;overflow-y:auto;padding:10px 12px}
+.step{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--s3);align-items:flex-start}
+.step:last-child{border-bottom:none}
+.step-ic{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px}
+.step-ic.turn{background:#EFF6FF;color:var(--bl)}
+.step-ic.straight{background:var(--s2);color:var(--mu)}
+.step-ic.dest{background:#DCFCE7;color:#15803D}
+.step-ic.start{background:var(--s2);color:var(--bl)}
+.step-txt{flex:1}
+.step-road{font-size:12px;font-weight:600;color:var(--ink);line-height:1.4}
+.step-dist{font-size:10px;color:var(--mu);margin-top:1px}
+.dp-ft{padding:12px 14px;border-top:1px solid var(--s3);flex-shrink:0}
+.btn-nav{width:100%;padding:11px;background:var(--bl);color:#fff;border:none;border-radius:var(--r12);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .15s}
+.btn-nav:hover{background:#2563EB}
+
+/* Station list */
+.sp{width:320px;flex-shrink:0;display:flex;flex-direction:column;border-left:1px solid var(--s3);background:var(--w)}
+.sp-hd{padding:14px 14px 10px;border-bottom:1px solid var(--s3);flex-shrink:0}
+.sp-count{font-size:12px;color:var(--mu);margin-bottom:8px}
+.sp-sort{display:flex;gap:5px}
+.srt{padding:4px 10px;border-radius:20px;border:1px solid var(--s3);font-size:11px;cursor:pointer;background:var(--w);color:var(--mu);transition:all .15s;font-family:'DM Sans',sans-serif}
+.srt.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.sp-list{flex:1;overflow-y:auto;padding:10px}
+.si{border:1.5px solid var(--s3);border-radius:var(--r12);padding:11px;margin-bottom:7px;cursor:pointer;transition:all .2s}
+.si:hover{border-color:var(--g);box-shadow:0 2px 10px rgba(0,200,150,.1)}
+.si.sel{border-color:var(--g);background:var(--gp)}
+.si-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px}
+.si-name{font-size:13px;font-weight:600;color:var(--ink);line-height:1.3;display:flex;align-items:center;gap:5px}
+.si-type-icon{font-size:14px}
+.badge{display:inline-flex;align-items:center;font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;flex-shrink:0}
+.bg{background:#DCFCE7;color:#15803D}
+.br{background:#FEE2E2;color:#DC2626}
+.ba{background:#FEF3C7;color:#D97706}
+.bb{background:#DBEAFE;color:#2563EB}
+.si-meta{display:flex;gap:8px;font-size:11px;color:var(--mu);margin-bottom:6px;flex-wrap:wrap}
+.si-bot{display:flex;justify-content:space-between;align-items:center}
+.si-price{font-size:13px;font-weight:700;color:var(--gd)}
+.si-rate{font-size:10px;color:var(--mu)}
+.si-stars{font-size:11px;color:var(--am)}
+.si-stars span{color:var(--mu);font-size:10px}
+
+/* Detail drawer */
+.dd{width:340px;flex-shrink:0;border-left:1px solid var(--s3);background:var(--w);overflow-y:auto;display:none}
+.dd.open{display:block}
+.dd-hero{height:140px;background:linear-gradient(135deg,var(--gp),#9FE1CB);position:relative;display:flex;align-items:center;justify-content:center}
+.dd-hi{width:56px;height:56px;background:var(--g);border-radius:14px;display:flex;align-items:center;justify-content:center}
+.dd-hi svg{width:30px;height:30px}
+.dd-close{position:absolute;top:10px;right:10px;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.85);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--ink)}
+.dd-body{padding:16px}
+.dd-name{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--ink);margin-bottom:3px;display:flex;align-items:center;gap:6px}
+.dd-type-badge{font-size:16px}
+.dd-addr{font-size:11px;color:var(--mu);margin-bottom:14px;display:flex;align-items:center;gap:4px}
+.dd-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:14px}
+.dds{background:var(--s);border-radius:var(--r8);padding:8px;text-align:center}
+.dds-val{font-size:14px;font-weight:700;color:var(--ink)}
+.dds-lab{font-size:9px;color:var(--mu);margin-top:2px}
+.dd-sec{margin-bottom:14px}
+.dd-sec-title{font-size:10px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px}
+.btn-dir{width:100%;padding:10px;background:#EFF6FF;color:var(--bl);border:1.5px solid #BFDBFE;border-radius:var(--r12);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:7px;transition:all .15s}
+.btn-dir:hover{background:#DBEAFE}
+.tgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:10px}
+.tslot{padding:6px 2px;border-radius:var(--r8);border:1.5px solid var(--s3);text-align:center;font-size:11px;font-weight:500;cursor:pointer;transition:all .15s;color:var(--ink3)}
+.tslot:hover:not(.taken){border-color:var(--g);background:var(--gp);color:var(--gd)}
+.tslot.pick{background:var(--g);color:#fff;border-color:var(--g)}
+.tslot.taken{background:var(--s2);color:var(--mu3);text-decoration:line-through;cursor:not-allowed}
+.csum{background:var(--s);border-radius:var(--r12);padding:10px;margin-bottom:12px}
+.cr{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px;color:var(--ink3)}
+.cr:last-child{margin-bottom:0;padding-top:7px;border-top:1px solid var(--s3);font-weight:700;font-size:13px}
+.btn-book{width:100%;padding:12px;background:var(--g);color:#fff;border:none;border-radius:var(--r12);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-book:hover{background:var(--gd)}
+.amenities{display:flex;gap:5px;flex-wrap:wrap}
+.am-tag{padding:3px 9px;border-radius:20px;background:var(--s2);font-size:11px;color:var(--mu);border:1px solid var(--s3)}
+
+/* QR / Charging */
+.chg-page{display:flex;flex:1;align-items:center;justify-content:center;padding:20px;gap:20px;flex-wrap:wrap;overflow-y:auto;background:var(--s)}
+.qr-card{background:var(--w);border-radius:20px;border:1px solid var(--s3);padding:24px;width:280px;flex-shrink:0;text-align:center}
+.chg-card{background:var(--w);border-radius:20px;border:1px solid var(--s3);flex:1;max-width:460px;min-width:260px;overflow:hidden}
+.cc-hd{padding:18px 20px;border-bottom:1px solid var(--s3);display:flex;justify-content:space-between;align-items:center}
+.cc-status{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600}
+.sdot{width:10px;height:10px;border-radius:50%;background:var(--mu3)}
+.sdot.on{background:var(--g);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,200,150,.4)}50%{box-shadow:0 0 0 6px rgba(0,200,150,0)}}
+.cc-body{padding:20px}
+.big{text-align:center;margin-bottom:20px}
+/* ✅ FIX: เปลี่ยนจาก Syne เป็น DM Sans เพื่อให้ตัวเลขอ่านง่ายและกลมกลืน */
+.big-val{font-family:'DM Sans',sans-serif;font-size:48px;font-weight:700;color:var(--ink);line-height:1}
+.big-unit{font-size:15px;color:var(--mu);font-weight:400;margin-left:3px}
+.big-lab{font-size:12px;color:var(--mu);margin-top:3px}
+.ptrack{background:var(--s2);border-radius:20px;height:9px;margin-bottom:20px;overflow:hidden}
+.pfill{height:100%;border-radius:20px;background:var(--g);transition:width .5s ease}
+.srow{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+.sbox{background:var(--s);border-radius:var(--r12);padding:10px;text-align:center;border:1px solid var(--s3)}
+.sbox-val{font-size:15px;font-weight:700;color:var(--ink)}
+.sbox-lab{font-size:10px;color:var(--mu);margin-top:2px}
+.btn-stop{width:100%;padding:12px;background:var(--rd);color:#fff;border:none;border-radius:var(--r12);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer}
+.btn-start{width:100%;padding:12px;background:var(--g);color:#fff;border:none;border-radius:var(--r12);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer}
+.qr-frame{width:140px;height:140px;margin:0 auto 12px;border:3px solid var(--g);border-radius:var(--r12);padding:7px;background:#fff}
+.qr-frame svg{width:100%;height:100%}
+.qr-code{font-size:11px;color:var(--mu);font-family:monospace;background:var(--s2);padding:5px 10px;border-radius:var(--r8);display:inline-block;margin-bottom:16px}
+
+/* History */
+.inner-page{padding:20px;overflow-y:auto;height:100%;background:var(--s)}
+.pg-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:10px}
+.pg-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--ink)}
+.pg-sub{font-size:12px;color:var(--mu);margin-top:2px}
+.btn-out{padding:8px 14px;border-radius:var(--r8);border:1.5px solid var(--s3);background:var(--w);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;color:var(--ink)}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.kpi{background:var(--w);border-radius:var(--r16);padding:16px;border:1px solid var(--s3);position:relative;overflow:hidden}
+.kpi-acc{position:absolute;top:0;left:0;right:0;height:3px}
+.kpi-lab{font-size:10px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+/* ✅ FIX: เปลี่ยนจาก Syne เป็น DM Sans */
+.kpi-val{font-family:'DM Sans',sans-serif;font-size:24px;font-weight:600;color:var(--ink);line-height:1;margin-bottom:4px}
+.kpi-ch{font-size:11px;font-weight:500;color:#16A34A}
+.card{background:var(--w);border-radius:var(--r16);border:1px solid var(--s3);overflow:hidden;margin-bottom:14px}
+.card-hd{padding:14px 16px;border-bottom:1px solid var(--s3);display:flex;justify-content:space-between;align-items:center}
+.card-title{font-size:14px;font-weight:600;color:var(--ink)}
+.card-act{font-size:12px;color:var(--g);cursor:pointer;font-weight:500}
+.hist-row{display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--s3)}
+.hist-row:last-child{border-bottom:none}
+.hist-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.hist-info{flex:1}
+.hist-name{font-size:13px;font-weight:600;color:var(--ink)}
+.hist-meta{font-size:11px;color:var(--mu);margin-top:1px}
+.hist-right{text-align:right}
+.hist-amt{font-size:13px;font-weight:700;color:var(--gd)}
+.hist-date{font-size:10px;color:var(--mu)}
+
+/* KYC */
+.kyc-wrap{padding:20px;max-width:720px;margin:0 auto;overflow-y:auto;height:100%}
+.ksteps{display:flex;gap:0;margin-bottom:28px;position:relative}
+.ksteps::before{content:'';position:absolute;top:17px;left:17px;right:17px;height:2px;background:var(--s3);z-index:0}
+.ks{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;position:relative;z-index:1;cursor:pointer}
+.ks-c{width:34px;height:34px;border-radius:50%;border:2px solid var(--s3);background:var(--w);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--mu);transition:all .2s}
+.ks.done .ks-c{background:var(--g);border-color:var(--g);color:#fff}
+.ks.cur .ks-c{background:var(--ink);border-color:var(--ink);color:#fff}
+.ks-lab{font-size:10px;color:var(--mu);text-align:center;font-weight:500}
+.ks.done .ks-lab,.ks.cur .ks-lab{color:var(--ink)}
+.kform{background:var(--w);border-radius:var(--r16);border:1px solid var(--s3);padding:24px;margin-bottom:12px}
+.kf-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--ink);margin-bottom:5px}
+.kf-desc{font-size:13px;color:var(--mu);margin-bottom:20px;line-height:1.6}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fl{font-size:12px;font-weight:500;color:var(--ink3)}
+.fi{padding:9px 11px;border-radius:var(--r8);border:1.5px solid var(--s3);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);outline:none;transition:border-color .15s}
+.fi:focus{border-color:var(--g)}
+.fi::placeholder{color:var(--mu3)}
+.ubox{border:2px dashed var(--s3);border-radius:var(--r12);padding:24px;text-align:center;cursor:pointer;transition:all .2s}
+.ubox:hover{border-color:var(--g);background:var(--gp)}
+.ubox.ok{border-color:var(--g);background:var(--gp)}
+.ubox-title{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:2px}
+.ubox-sub{font-size:11px;color:var(--mu)}
+.btn-solid{padding:10px 16px;border-radius:var(--r8);border:none;background:var(--g);color:#fff;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-solid:hover{background:var(--gd)}
+.btn-line{padding:9px 14px;border-radius:var(--r8);border:1.5px solid var(--s3);background:var(--w);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--ink)}
+
+/* ── Bottom Nav (Mobile) ── */
+.bottom-nav{display:none;height:var(--bottom-nav);background:var(--ink2);border-top:1px solid rgba(255,255,255,.08);flex-shrink:0}
+.bn-items{display:flex;height:100%}
+.bn-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:rgba(255,255,255,.4);border:none;background:none;transition:color .15s;padding:0;position:relative;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.bn-item.active{color:var(--g)}
+.bn-item svg{width:20px;height:20px;pointer-events:none}
+.bn-label{font-size:10px;font-weight:500;pointer-events:none}
+.bn-dot{position:absolute;top:8px;right:calc(50% - 16px);width:6px;height:6px;background:var(--g);border-radius:50%}
+
+/* Overlay for mobile sidebar */
+.sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:199}
+
+/* ── RESPONSIVE ── */
+@media(max-width:1024px){
+  .dd{width:300px}
+  .sp{width:280px}
+  .dir-panel{width:270px}
+}
+@media(max-width:768px){
+  .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:200;transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .sb-overlay.show{display:block}
+  .menu-btn{display:flex}
+  .tb-tabs{display:none}
+  .map-wrap{flex-direction:column}
+  .sp{width:100%;height:200px;border-left:none;border-top:1px solid var(--s3);flex-shrink:0}
+  .sp-list{display:flex;gap:8px;padding:8px;overflow-x:auto;overflow-y:hidden;flex-direction:row}
+  .si{margin-bottom:0;min-width:220px;flex-shrink:0}
+  .dd{position:fixed;right:0;top:var(--topbar);bottom:0;z-index:100;width:320px;box-shadow:var(--shl);display:none}
+  .dd.open{display:block}
+  .dir-panel{position:fixed;left:0;top:var(--topbar);bottom:60px;z-index:100;width:300px;box-shadow:var(--shl)}
+  .dir-panel.hidden{width:0;display:none}
+  .bottom-nav{display:flex}
+  .fchip{display:none}
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .frow{grid-template-columns:1fr}
+  .chg-page{flex-direction:column;align-items:center}
+  .btn-solid{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+}
+@media(max-width:480px){
+  .topbar{padding:0 12px}
+  .inner-page{padding:14px}
+  .kpi-grid{grid-template-columns:repeat(2,1fr);gap:8px}
+  .kpi-val{font-size:20px;font-family:'DM Sans',sans-serif}
+  .dd{width:100%;right:0;left:0}
+  .dir-panel{width:100%}
+  .sp{height:180px}
+  .fbar{left:8px;right:8px}
+  .qr-card{width:100%;max-width:300px}
+  .chg-card{width:100%}
+}
+/* scrollbar */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--s3);border-radius:10px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.anim{animation:fadeUp .25s ease both}
+.ad1{animation-delay:.05s}.ad2{animation-delay:.1s}.ad3{animation-delay:.15s}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- Mobile overlay -->
+<div class="sb-overlay" id="sbo" onclick="closeSidebar()"></div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sb-logo">
+    <div class="sb-brand">
+      <div class="sb-bolt"><svg viewBox="0 0 24 24" fill="white"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+      <div>
+        <div class="sb-name">ChargeMate</div>
+        <div><span class="sb-role">Driver App</span></div>
+      </div>
+    </div>
+  </div>
+  <nav class="sb-nav">
+    <div class="nav-sec">เมนูหลัก</div>
+    <button class="ni active" onclick="goPage('find');closeSidebar()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>ค้นหาจุดชาร์จ
+    </button>
+    <button class="ni" onclick="goPage('charging');closeSidebar()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>QR &amp; ชาร์จ
+      <span class="ni-badge">1</span>
+    </button>
+    <button class="ni" onclick="goPage('history');closeSidebar()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>ประวัติการชาร์จ
+    </button>
+    <div class="nav-sec">บัญชี</div>
+    <button class="ni" onclick="goPage('kyc');closeSidebar()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>KYC &amp; ยืนยันตัวตน
+    </button>
+    <button class="ni">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>การแจ้งเตือน
+      <span class="ni-badge">3</span>
+    </button>
+  </nav>
+  <div class="sb-footer">
+    <a class="sb-host-link" href="host-app.html" target="_blank">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      <span>สลับไปยัง Host Dashboard →</span>
+    </a>
+    <div class="user-row" style="margin-top:6px">
+      <div class="u-av">สม</div>
+      <div><div class="u-name">สมชาย ใจดี</div><div class="u-sub">Verified Driver</div></div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <header class="topbar">
+    <button class="menu-btn" id="menu-btn" onclick="openSidebar()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="topbar-title" id="pg-title">ค้นหาจุดชาร์จ</div>
+    <div class="tb-tabs" id="tb-tabs">
+      <button class="ttab active" onclick="setTab(0)">แผนที่</button>
+      <button class="ttab" onclick="setTab(1)">รายการ</button>
+    </div>
+    <div class="ib" style="flex-shrink:0">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <div class="ndot"></div>
+    </div>
+  </header>
+
+  <div class="content">
+
+    <!-- FIND PAGE -->
+    <div class="page active" id="pg-find">
+      <div class="map-wrap">
+        <div class="map-panel">
+          <div id="lmap"></div>
+          <div class="fbar">
+            <div class="fwrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input class="finput" id="msearch" placeholder="ค้นหาจุดชาร์จ หรือพื้นที่..."/>
+            </div>
+            <button class="fchip on" onclick="tChip(this)">⚡ ว่าง</button>
+            <button class="fchip" onclick="tChip(this)">Type 2</button>
+            <button class="fchip" onclick="tChip(this)">CCS2</button>
+          </div>
+          <div class="map-legend">
+            <div class="leg"><div class="ld" style="background:#00C896"></div>ว่าง</div>
+            <div class="leg"><div class="ld" style="background:#EF4444"></div>ไม่ว่าง</div>
+            <div class="leg"><div class="ld" style="background:#F59E0B"></div>จำกัด</div>
+            <div class="leg"><div class="ld" style="background:#3B82F6"></div>คุณ</div>
+          </div>
+          <button class="locate-btn" onclick="locateMe()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+          </button>
+        </div>
+
+        <!-- Direction panel -->
+        <div class="dir-panel hidden" id="dir-panel">
+          <div class="dp-hd">
+            <div class="dp-dest">
+              <span id="dp-dest-name">เส้นทาง</span>
+              <button class="dp-close" onclick="clearRoute()">✕</button>
+            </div>
+            <div class="dp-info">
+              <span class="dp-badge" id="dp-dist">—</span>
+              <div>
+                <div class="dp-time-label" id="dp-time">กำลังคำนวณ...</div>
+                <div class="dp-via" id="dp-via">ผ่าน —</div>
+              </div>
+            </div>
+          </div>
+          <div class="dp-steps" id="dp-steps">
+            <div style="text-align:center;padding:20px;color:var(--mu);font-size:12px">กำลังโหลดเส้นทาง...</div>
+          </div>
+          <div class="dp-ft">
+            <button class="btn-nav" onclick="goPage('charging')">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              เริ่มนำทาง
+            </button>
+          </div>
+        </div>
+
+        <!-- Station list panel -->
+        <div class="sp" id="sp-panel">
+          <div class="sp-hd">
+            <div class="sp-count">พบ <strong>12 จุดชาร์จ</strong> ในรัศมี 5 กม.</div>
+            <div class="sp-sort">
+              <button class="srt active">ใกล้สุด</button>
+              <button class="srt">ราคา</button>
+              <button class="srt">คะแนน</button>
+            </div>
+          </div>
+          <div class="sp-list">
+            <div class="si sel" onclick="selSt(0)">
+              <div class="si-top"><div class="si-name">🏠 บ้านคุณวิชัย ลาดพร้าว</div><span class="badge bg">ว่าง</span></div>
+              <div class="si-meta"><span>📍 0.8 กม.</span><span>⚡ Type 2 · 22 kW</span><span>🚗 1 คัน</span></div>
+              <div class="si-bot"><div><div class="si-price">฿4.50/kWh</div><div class="si-rate">≈ ฿135/ชม.</div></div><div class="si-stars">★★★★★ <span>4.9</span></div></div>
+            </div>
+            <div class="si" onclick="selSt(1)">
+              <div class="si-top"><div class="si-name">🏢 อาคาร The Plex ชั้น B2</div><span class="badge bg">ว่าง 2</span></div>
+              <div class="si-meta"><span>📍 1.4 กม.</span><span>⚡ CCS2 · 50 kW</span><span>🚗 2 คัน</span></div>
+              <div class="si-bot"><div><div class="si-price">฿5.20/kWh</div><div class="si-rate">≈ ฿260/ชม.</div></div><div class="si-stars">★★★★☆ <span>4.6</span></div></div>
+            </div>
+            <div class="si" onclick="selSt(4)">
+              <div class="si-top"><div class="si-name">🏙️ คอนโด Life Ladprao</div><span class="badge bg">ว่าง</span></div>
+              <div class="si-meta"><span>📍 1.8 กม.</span><span>⚡ Type 2 · 7 kW</span><span>🚗 1 คัน</span></div>
+              <div class="si-bot"><div><div class="si-price">฿3.90/kWh</div><div class="si-rate">≈ ฿27/ชม.</div></div><div class="si-stars">★★★★★ <span>5.0</span></div></div>
+            </div>
+            <div class="si" onclick="selSt(3)">
+              <div class="si-top"><div class="si-name">🏠 บ้านคุณมนต์ชัย รัชดา</div><span class="badge ba">1 ว่าง</span></div>
+              <div class="si-meta"><span>📍 2.1 กม.</span><span>⚡ Type 2 · 11 kW</span><span>🚗 2 คัน</span></div>
+              <div class="si-bot"><div><div class="si-price">฿4.80/kWh</div><div class="si-rate">≈ ฿53/ชม.</div></div><div class="si-stars">★★★★☆ <span>4.7</span></div></div>
+            </div>
+            <div class="si" onclick="selSt(2)">
+              <div class="si-top"><div class="si-name">☕ SCB Next (ออฟฟิศ+คาเฟ่)</div><span class="badge br">ไม่ว่าง</span></div>
+              <div class="si-meta"><span>📍 2.9 กม.</span><span>⚡ CCS2 · 150 kW</span><span>🚗 4 คัน</span></div>
+              <div class="si-bot"><div><div class="si-price">฿6.50/kWh</div><div class="si-rate">≈ ฿975/ชม.</div></div><div class="si-stars">★★★★★ <span>4.8</span></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Detail drawer -->
+        <div class="dd open" id="dd">
+          <div class="dd-hero">
+            <div class="dd-hi"><svg viewBox="0 0 24 24" fill="white"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+            <button class="dd-close" onclick="document.getElementById('dd').classList.remove('open')">✕</button>
+          </div>
+          <div class="dd-body">
+            <div class="dd-name"><span class="dd-type-badge" id="dd-icon">🏠</span><span id="dd-name">บ้านคุณวิชัย ลาดพร้าว</span></div>
+            <div class="dd-addr"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--mu)" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg><span id="dd-addr">ซ.ลาดพร้าว 71 แขวงวังทองหลาง</span></div>
+            <div class="dd-stats">
+              <div class="dds"><div class="dds-val" style="color:var(--g)" id="dd-kw">22 kW</div><div class="dds-lab">พลังงาน</div></div>
+              <div class="dds"><div class="dds-val" id="dd-type">Type 2</div><div class="dds-lab">หัวชาร์จ</div></div>
+              <div class="dds"><div class="dds-val" style="color:var(--am)" id="dd-rat">4.9★</div><div class="dds-lab">คะแนน</div></div>
+            </div>
+            <button class="btn-dir" onclick="getDir()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+              นำทาง (ขับรถ) ไปจุดชาร์จนี้
+            </button>
+            <div class="dd-sec">
+              <div class="dd-sec-title">เลือกช่วงเวลา</div>
+              <div class="tgrid">
+                <div class="tslot taken">08:00</div><div class="tslot taken">09:00</div>
+                <div class="tslot taken">10:00</div><div class="tslot" onclick="pickT(this)">11:00</div>
+                <div class="tslot pick" onclick="pickT(this)">12:00</div><div class="tslot" onclick="pickT(this)">13:00</div>
+                <div class="tslot" onclick="pickT(this)">14:00</div><div class="tslot taken">15:00</div>
+                <div class="tslot" onclick="pickT(this)">16:00</div><div class="tslot" onclick="pickT(this)">17:00</div>
+                <div class="tslot" onclick="pickT(this)">18:00</div><div class="tslot" onclick="pickT(this)">19:00</div>
+              </div>
+            </div>
+            <div class="dd-sec">
+              <div class="dd-sec-title">สรุปค่าใช้จ่าย</div>
+              <div class="csum">
+                <div class="cr"><span>ราคาพลังงาน</span><span id="dd-price">฿4.50/kWh</span></div>
+                <div class="cr"><span>ระยะเวลาโดยประมาณ</span><span>2 ชั่วโมง</span></div>
+                <div class="cr"><span>ค่าบริการแพลตฟอร์ม</span><span>฿10</span></div>
+                <div class="cr"><span>รวมโดยประมาณ</span><span style="color:var(--g)">฿145–208</span></div>
+              </div>
+            </div>
+            <div class="dd-sec">
+              <div class="dd-sec-title">สิ่งอำนวยความสะดวก</div>
+              <div class="amenities">
+                <span class="am-tag">🅿️ ที่จอดรถ</span><span class="am-tag">💡 ไฟส่อง</span>
+                <span class="am-tag">🚽 ห้องน้ำ</span><span class="am-tag">📶 Wi-Fi</span>
+              </div>
+            </div>
+            <button class="btn-book" onclick="goPage('charging')">จองและชำระเงิน →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHARGING PAGE -->
+    <div class="page" id="pg-charging">
+      <div class="chg-page">
+        <div class="qr-card anim">
+          <div style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:4px">QR Code ชาร์จ</div>
+          <div style="font-size:11px;color:var(--mu);margin-bottom:16px">การจอง #CM-2026-4782</div>
+          <div class="qr-frame">
+            <svg viewBox="0 0 21 21" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">
+              <path fill="#000" d="M0 0h7v1H0zM8 0h1v1H8zM10 0h1v1H10zM12 0h1v1H12zM14 0h7v1H14zM0 1h1v1H0zM6 1h1v1H6zM8 1h1v1H8zM10 1h3v1H10zM14 1h1v1H14zM20 1h1v1H20zM0 2h1v1H0zM2 2h3v1H2zM6 2h1v1H6zM9 2h1v1H9zM11 2h2v1H11zM14 2h1v1H14zM16 2h3v1H16zM20 2h1v1H20zM0 3h1v1H0zM2 3h3v1H2zM6 3h1v1H6zM8 3h1v1H8zM11 3h1v1H11zM13 3h1v1H13zM14 3h1v1H14zM16 3h3v1H16zM20 3h1v1H20zM0 4h1v1H0zM2 4h3v1H2zM6 4h1v1H6zM8 4h1v1H8zM10 4h1v1H10zM12 4h2v1H12zM14 4h1v1H14zM16 4h3v1H16zM20 4h1v1H20zM0 5h1v1H0zM6 5h1v1H6zM8 5h3v1H8zM12 5h1v1H12zM14 5h1v1H14zM20 5h1v1H20zM0 6h7v1H0zM8 6h1v1H8zM10 6h1v1H10zM12 6h1v1H12zM14 6h7v1H14zM9 7h1v1H9zM11 7h2v1H11zM0 8h2v1H0zM3 8h1v1H3zM5 8h3v1H5zM9 8h1v1H9zM11 8h1v1H11zM13 8h2v1H13zM16 8h1v1H16zM18 8h1v1H18zM20 8h1v1H20zM1 9h1v1H1zM3 9h2v1H3zM6 9h1v1H6zM8 9h1v1H8zM10 9h1v1H10zM14 9h1v1H14zM16 9h2v1H16zM19 9h1v1H19zM0 10h1v1H0zM2 10h2v1H2zM5 10h2v1H5zM8 10h1v1H8zM10 10h3v1H10zM14 10h3v1H14zM18 10h1v1H18zM20 10h1v1H20zM0 11h2v1H0zM4 11h2v1H4zM7 11h2v1H7zM11 11h1v1H11zM14 11h1v1H14zM16 11h1v1H16zM18 11h1v1H18zM20 11h1v1H20zM0 12h1v1H0zM4 12h1v1H4zM6 12h3v1H6zM10 12h4v1H10zM15 12h3v1H15zM19 12h2v1H19zM8 13h2v1H8zM11 13h1v1H11zM14 13h1v1H14zM16 13h4v1H16zM0 14h7v1H0zM8 14h2v1H8zM11 14h2v1H11zM14 14h1v1H14zM17 14h1v1H17zM19 14h2v1H19zM0 15h1v1H0zM6 15h1v1H6zM9 15h1v1H9zM11 15h1v1H11zM13 15h2v1H13zM16 15h1v1H16zM18 15h1v1H18zM0 16h1v1H0zM2 16h3v1H2zM6 16h1v1H6zM8 16h3v1H8zM12 16h2v1H12zM15 16h1v1H15zM17 16h1v1H17zM19 16h2v1H19zM0 17h1v1H0zM2 17h3v1H2zM6 17h1v1H6zM8 17h1v1H8zM10 17h1v1H10zM12 17h1v1H12zM14 17h2v1H14zM17 17h4v1H17zM0 18h1v1H0zM2 18h3v1H2zM6 18h1v1H6zM9 18h2v1H9zM12 18h1v1H12zM14 18h1v1H14zM16 18h2v1H16zM19 18h2v1H19zM0 19h1v1H0zM6 19h1v1H6zM8 19h1v1H8zM10 19h1v1H10zM12 19h2v1H12zM16 19h1v1H16zM18 19h1v1H18zM0 20h7v1H0zM8 20h3v1H8zM12 20h3v1H12zM17 20h1v1H17zM19 20h2v1H19z"/>
+            </svg>
+          </div>
+          <div class="qr-code">CM-A7F3-2026-QR9X</div>
+          <p style="font-size:11px;color:var(--mu);line-height:1.7">บ้านคุณวิชัย ลาดพร้าว<br>ศุกร์ 20 มี.ค. · 12:00–14:00<br>Type 2 · 22 kW</p>
+        </div>
+        <div class="chg-card anim ad1">
+          <div class="cc-hd">
+            <div class="cc-status"><div class="sdot" id="sdot"></div><span id="stxt">รอการสแกน QR</span></div>
+            <span class="badge bb">จอง #4782</span>
+          </div>
+          <div class="cc-body">
+            <div class="big">
+              <div class="big-val" id="kwh-d">0.0<span class="big-unit">kWh</span></div>
+              <div class="big-lab">พลังงานที่ชาร์จแล้ว</div>
+            </div>
+            <div class="ptrack"><div class="pfill" id="pf" style="width:0%"></div></div>
+            <div class="srow">
+              <div class="sbox"><div class="sbox-val" id="soc-d">45%</div><div class="sbox-lab">SOC แบต</div></div>
+              <div class="sbox"><div class="sbox-val" id="time-d">00:00</div><div class="sbox-lab">เวลาผ่านไป</div></div>
+              <div class="sbox"><div class="sbox-val" id="cost-d" style="color:var(--g)">฿0</div><div class="sbox-lab">ค่าใช้จ่าย</div></div>
+            </div>
+            <div style="background:var(--s);border-radius:var(--r12);padding:11px 13px;margin-bottom:14px;font-size:12px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--mu)">กำลังไฟ</span><span id="pow-d" style="font-weight:600">— kW</span></div>
+              <div style="display:flex;justify-content:space-between"><span style="color:var(--mu)">ระยะทางเพิ่ม</span><span id="rng-d" style="font-weight:600">— กม.</span></div>
+            </div>
+            <button class="btn-start" id="chg-btn" onclick="toggleChg()">⚡ เริ่มชาร์จ (จำลอง)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY PAGE -->
+    <div class="page" id="pg-history">
+      <div class="inner-page">
+        <div class="pg-hd anim">
+          <div><div class="pg-title">ประวัติการชาร์จ</div><div class="pg-sub">มีนาคม 2026 — 12 เซสชัน</div></div>
+          <button class="btn-out">ส่งออก CSV</button>
+        </div>
+        <div class="kpi-grid anim ad1">
+          <div class="kpi"><div class="kpi-acc" style="background:var(--g)"></div><div class="kpi-lab">เซสชันทั้งหมด</div><div class="kpi-val">12</div><div class="kpi-ch">↑ +3 จากเดือนก่อน</div></div>
+          <div class="kpi"><div class="kpi-acc" style="background:var(--bl)"></div><div class="kpi-lab">พลังงานใช้</div><div class="kpi-val">234 kWh</div><div class="kpi-ch">ประหยัด ฿940</div></div>
+          <div class="kpi"><div class="kpi-acc" style="background:var(--am)"></div><div class="kpi-lab">ค่าใช้จ่ายรวม</div><div class="kpi-val">฿1,890</div><div class="kpi-ch" style="color:var(--mu)">เฉลี่ย ฿157/ครั้ง</div></div>
+          <div class="kpi"><div class="kpi-acc" style="background:var(--g)"></div><div class="kpi-lab">CO₂ ลดได้</div><div class="kpi-val">109 kg</div><div class="kpi-ch">เทียบน้ำมัน</div></div>
+        </div>
+        <div class="card anim ad2">
+          <div class="card-hd"><div class="card-title">รายการล่าสุด</div><div class="card-act">ดูทั้งหมด</div></div>
+          <div class="hist-row"><div class="hist-av">🏢</div><div class="hist-info"><div class="hist-name">อาคาร The Plex</div><div class="hist-meta">2ชม. 15น. · 34.2 kWh</div></div><div class="hist-right"><div class="hist-amt">฿178</div><div class="hist-date">18 มี.ค.</div></div></div>
+          <div class="hist-row"><div class="hist-av">🏠</div><div class="hist-info"><div class="hist-name">บ้านคุณวิชัย</div><div class="hist-meta">1ชม. 45น. · 26.8 kWh</div></div><div class="hist-right"><div class="hist-amt">฿145</div><div class="hist-date">15 มี.ค.</div></div></div>
+          <div class="hist-row"><div class="hist-av">🏠</div><div class="hist-info"><div class="hist-name">บ้านคุณมนต์ชัย</div><div class="hist-meta">3ชม. · 41.0 kWh</div></div><div class="hist-right"><div class="hist-amt">฿203</div><div class="hist-date">12 มี.ค.</div></div></div>
+          <div class="hist-row"><div class="hist-av">☕</div><div class="hist-info"><div class="hist-name">SCB Next คาเฟ่</div><div class="hist-meta">2ชม. · 31.2 kWh</div></div><div class="hist-right"><div class="hist-amt">฿162</div><div class="hist-date">9 มี.ค.</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KYC PAGE -->
+    <div class="page" id="pg-kyc">
+      <div class="kyc-wrap">
+        <div class="pg-hd anim"><div><div class="pg-title">ยืนยันตัวตน (KYC)</div><div class="pg-sub">ทำ KYC เพื่อปลดล็อกการจองและรับเงิน</div></div><span class="badge ba" style="font-size:12px;padding:5px 12px">กำลังดำเนินการ</span></div>
+        <div class="ksteps anim ad1">
+          <div class="ks done" onclick="setKyc(0)"><div class="ks-c">✓</div><div class="ks-lab">ข้อมูลส่วนตัว</div></div>
+          <div class="ks done" onclick="setKyc(1)"><div class="ks-c">✓</div><div class="ks-lab">บัตรประชาชน</div></div>
+          <div class="ks cur" onclick="setKyc(2)"><div class="ks-c">3</div><div class="ks-lab">Selfie</div></div>
+          <div class="ks" onclick="setKyc(3)"><div class="ks-c">4</div><div class="ks-lab">ทะเบียนรถ</div></div>
+          <div class="ks" onclick="setKyc(4)"><div class="ks-c">5</div><div class="ks-lab">ธนาคาร</div></div>
+        </div>
+        <div class="kform anim ad2">
+          <div class="kf-title">Selfie &amp; Liveness Check</div>
+          <div class="kf-desc">ถ่ายรูปใบหน้าเพื่อยืนยันว่าตรงกับบัตรประชาชน ระบบวิเคราะห์ด้วย AI Face Matching</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+            <div class="ubox"><div style="font-size:24px;margin-bottom:6px">📷</div><div class="ubox-title">ถ่ายรูปหน้าตรง</div><div class="ubox-sub">มองตรงกล้อง</div></div>
+            <div class="ubox ok"><div style="font-size:24px;margin-bottom:6px">✅</div><div class="ubox-title" style="color:var(--gd)">อัปโหลดแล้ว</div><div class="ubox-sub">ผ่านการตรวจสอบ</div></div>
+          </div>
+          <div style="background:var(--s);border-radius:var(--r12);padding:12px;margin-bottom:18px">
+            <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:7px">ผลการตรวจสอบ AI</div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--mu)">Face Match Score</span><span style="font-weight:600;color:var(--g)">98.2% ✓</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--mu)">Liveness Detection</span><span style="font-weight:600;color:var(--g)">ผ่าน ✓</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--mu)">Spoofing Check</span><span style="font-weight:600;color:var(--g)">ไม่พบ ✓</span></div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn-line" style="flex:1">← ย้อนกลับ</button>
+            <button class="btn-solid" style="flex:2" onclick="setKyc(3)">ถัดไป: ทะเบียนรถ →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- content -->
+
+  <!-- BOTTOM NAV (mobile) -->
+  <nav class="bottom-nav">
+    <div class="bn-items">
+      <button class="bn-item active" onclick="goPage('find')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <span class="bn-label">ค้นหา</span>
+      </button>
+      <button class="bn-item" onclick="goPage('charging')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        <span class="bn-label">ชาร์จ</span>
+        <div class="bn-dot"></div>
+      </button>
+      <button class="bn-item" onclick="goPage('history')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span class="bn-label">ประวัติ</span>
+      </button>
+      <button class="bn-item" onclick="goPage('kyc')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span class="bn-label">บัญชี</span>
+      </button>
+    </div>
+  </nav>
+</main>
+</div>
+
+<script>
+const STS=[
+  {id:0,name:'บ้านคุณวิชัย ลาดพร้าว',icon:'🏠',addr:'ซ.ลาดพร้าว 71 แขวงวังทองหลาง',lat:13.7800,lng:100.6050,kw:'22 kW',type:'Type 2',price:'฿4.50/kWh',rat:'4.9★',col:'#00C896'},
+  {id:1,name:'อาคาร The Plex ชั้น B2',icon:'🏢',addr:'ถ.รัชดาภิเษก แขวงห้วยขวาง',lat:13.7730,lng:100.5880,kw:'50 kW',type:'CCS2',price:'฿5.20/kWh',rat:'4.6★',col:'#00C896'},
+  {id:2,name:'SCB Next (ออฟฟิศ+คาเฟ่)',icon:'☕',addr:'ถ.รัชโยธิน แขวงลาดยาว',lat:13.8050,lng:100.5680,kw:'150 kW',type:'CCS2',price:'฿6.50/kWh',rat:'4.8★',col:'#EF4444'},
+  {id:3,name:'บ้านคุณมนต์ชัย รัชดา',icon:'🏠',addr:'ซ.รัชดา 7 แขวงดินแดง',lat:13.7680,lng:100.5720,kw:'11 kW',type:'Type 2',price:'฿4.80/kWh',rat:'4.7★',col:'#F59E0B'},
+  {id:4,name:'คอนโด Life Ladprao',icon:'🏙️',addr:'ถ.ลาดพร้าว แขวงจตุจักร',lat:13.8120,lng:100.5600,kw:'7 kW',type:'Type 2',price:'฿3.90/kWh',rat:'5.0★',col:'#00C896'},
+];
+let uLat=13.790,uLng=100.595,map,uMark,routeL=null,selId=0;
+const OSRM='https://router.project-osrm.org/route/v1';
+const TURNS={['turn-left']:'↰',['turn-right']:'↱',['turn-slight-left']:'↖',['turn-slight-right']:'↗',straight:'↑',depart:'📍',arrive:'⚡'};
+
+function initMap(){
+  map=L.map('lmap',{zoomControl:false}).setView([uLat,uLng],14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:19}).addTo(map);
+  L.control.zoom({position:'bottomright'}).addTo(map);
+  const uIco=L.divIcon({html:'<div style="width:14px;height:14px;background:#3B82F6;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 5px rgba(59,130,246,.2)"></div>',iconSize:[14,14],iconAnchor:[7,7],className:''});
+  uMark=L.marker([uLat,uLng],{icon:uIco}).addTo(map).bindPopup('<div style="padding:8px 10px;font-family:DM Sans,sans-serif;font-size:12px;font-weight:600">📍 ตำแหน่งของคุณ</div>');
+  STS.forEach(s=>{
+    const icon=L.divIcon({html:`<div style="background:${s.col};color:#fff;font-size:11px;font-weight:700;padding:5px 10px;border-radius:20px;white-space:nowrap;box-shadow:0 2px 12px rgba(0,0,0,.2);border:2px solid #fff;cursor:pointer;display:flex;align-items:center;gap:4px">${s.icon} ${s.price.split('/')[0]}</div>`,className:'',iconAnchor:[40,16]});
+    const mk=L.marker([s.lat,s.lng],{icon}).addTo(map).bindPopup(popup(s));
+    mk.on('click',()=>selSt(s.id));
+  });
+  setTimeout(()=>selSt(0),500);
+}
+
+function popup(s){
+  return`<div style="font-family:'DM Sans',sans-serif;padding:12px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:3px">${s.icon} ${s.name}</div>
+    <div style="font-size:11px;color:#64748B;margin-bottom:8px">${s.addr}</div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <span style="background:#E6FBF5;color:#00A07A;font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px">${s.kw}</span>
+      <span style="background:#F1F5F9;color:#64748B;font-size:10px;padding:2px 7px;border-radius:20px">${s.type}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span style="font-size:14px;font-weight:700;color:#00A07A">${s.price}</span>
+      <span style="color:#F59E0B;font-size:12px">${s.rat}</span>
+    </div>
+    <button onclick="getDir()" style="width:100%;padding:8px;background:#3B82F6;color:#fff;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer">นำทาง (ขับรถ) →</button>
+  </div>`;
+}
+
+function selSt(id){
+  selId=id;const s=STS[id];
+  document.querySelectorAll('.si').forEach((el,i)=>el.classList.toggle('sel',STS[i]&&STS[i].id===id||(id===4&&i===2)||(id===3&&i===3)));
+  document.getElementById('dd-icon').textContent=s.icon;
+  document.getElementById('dd-name').textContent=s.name;
+  document.getElementById('dd-addr').textContent=s.addr;
+  document.getElementById('dd-kw').textContent=s.kw;
+  document.getElementById('dd-type').textContent=s.type;
+  document.getElementById('dd-rat').textContent=s.rat;
+  document.getElementById('dd-price').textContent=s.price;
+  document.getElementById('dd').classList.add('open');
+  map.panTo([s.lat,s.lng],{animate:true,duration:.4});
+}
+
+async function getDir(){
+  const s=STS[selId];
+  document.getElementById('dir-panel').classList.remove('hidden');
+  document.getElementById('dd').classList.remove('open');
+  document.getElementById('dp-dest-name').textContent=s.name;
+  document.getElementById('dp-steps').innerHTML='<div style="text-align:center;padding:20px;color:#64748B;font-size:12px">กำลังโหลด...</div>';
+  try{
+    const url=`${OSRM}/driving/${uLng},${uLat};${s.lng},${s.lat}?overview=full&geometries=geojson&steps=true`;
+    const r=await fetch(url);const d=await r.json();
+    if(d.code!=='Ok')throw new Error();
+    const rt=d.routes[0];
+    const dist=(rt.distance/1000).toFixed(1);
+    const mins=Math.round(rt.duration/60);
+    const timeStr=mins<60?`${mins} นาที`:`${Math.floor(mins/60)} ชม. ${mins%60} น.`;
+    document.getElementById('dp-dist').textContent=`${dist} กม.`;
+    document.getElementById('dp-time').textContent=timeStr;
+    document.getElementById('dp-via').textContent=`ผ่าน ${s.addr.split(' ')[0]}`;
+    if(routeL)map.removeLayer(routeL);
+    routeL=L.geoJSON(rt.geometry,{style:{color:'#3B82F6',weight:5,opacity:.85,lineCap:'round',lineJoin:'round'}}).addTo(map);
+    map.fitBounds(routeL.getBounds(),{padding:[50,50]});
+    const steps=rt.legs[0].steps;
+    document.getElementById('dp-steps').innerHTML=steps.map((st,i)=>{
+      const mn=st.maneuver.type+(st.maneuver.modifier?'-'+st.maneuver.modifier:'');
+      const ico=TURNS[mn]||TURNS[st.maneuver.type]||'↑';
+      const isL=i===steps.length-1,isF=i===0;
+      const dist=st.distance<1000?`${Math.round(st.distance)} ม.`:`${(st.distance/1000).toFixed(1)} กม.`;
+      const road=st.name||(isL?s.name:isF?'จุดเริ่มต้น':'ต่อเนื่อง');
+      const cls=isF?'start':isL?'dest':mn.includes('turn')?'turn':'straight';
+      return`<div class="step"><div class="step-ic ${cls}">${isF?'📍':isL?'⚡':ico}</div><div class="step-txt"><div class="step-road">${road}</div><div class="step-dist">${isF?'ออกจากตำแหน่งของคุณ':dist}</div></div></div>`;
+    }).join('');
+  }catch(e){fallbackRoute(s);}
+}
+
+function fallbackRoute(s){
+  if(routeL)map.removeLayer(routeL);
+  routeL=L.polyline([[uLat,uLng],[s.lat,s.lng]],{color:'#3B82F6',weight:5,opacity:.8,dashArray:'8 5'}).addTo(map);
+  map.fitBounds(routeL.getBounds(),{padding:[50,50]});
+  const dm=map.distance([uLat,uLng],[s.lat,s.lng]);
+  document.getElementById('dp-dist').textContent=`${(dm/1000).toFixed(1)} กม.`;
+  document.getElementById('dp-time').textContent=`${Math.round(dm/500)} นาที`;
+  document.getElementById('dp-via').textContent='เส้นทางโดยประมาณ';
+  document.getElementById('dp-steps').innerHTML=[
+    {ic:'📍',cls:'start',r:'จุดเริ่มต้น',d:''},
+    {ic:'↱',cls:'turn',r:'เลี้ยวขวาที่สี่แยก',d:`${Math.round(dm*.2)} ม.`},
+    {ic:'↑',cls:'straight',r:`ตรงไป ${s.addr.split(' ')[0]}`,d:`${Math.round(dm*.5)} ม.`},
+    {ic:'↰',cls:'turn',r:'เลี้ยวซ้ายเข้าซอย',d:`${Math.round(dm*.2)} ม.`},
+    {ic:'⚡',cls:'dest',r:s.name,d:'ถึงจุดหมาย'},
+  ].map(st=>`<div class="step"><div class="step-ic ${st.cls}">${st.ic}</div><div class="step-txt"><div class="step-road">${st.r}</div><div class="step-dist">${st.d}</div></div></div>`).join('');
+}
+
+function clearRoute(){
+  if(routeL){map.removeLayer(routeL);routeL=null;}
+  document.getElementById('dir-panel').classList.add('hidden');
+  document.getElementById('dd').classList.add('open');
+  map.setView([uLat,uLng],14,{animate:true});
+}
+
+function locateMe(){
+  if(!navigator.geolocation){map.setView([uLat,uLng],15);return;}
+  navigator.geolocation.getCurrentPosition(p=>{
+    uLat=p.coords.latitude;uLng=p.coords.longitude;
+    uMark.setLatLng([uLat,uLng]);map.setView([uLat,uLng],15,{animate:true});
+  },()=>map.setView([uLat,uLng],15,{animate:true}));
+}
+
+function tChip(el){el.classList.toggle('on');}
+function pickT(el){if(el.classList.contains('taken'))return;document.querySelectorAll('.tslot').forEach(s=>s.classList.remove('pick'));el.classList.add('pick');}
+
+const PAGE_TITLES={find:'ค้นหาจุดชาร์จ',charging:'QR & กำลังชาร์จ',history:'ประวัติการชาร์จ',kyc:'KYC & ยืนยันตัวตน'};
+function goPage(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.bn-item').forEach(b=>b.classList.remove('active'));
+  const pg=document.getElementById('pg-'+name);if(pg)pg.classList.add('active');
+  document.getElementById('pg-title').textContent=PAGE_TITLES[name]||name;
+  document.getElementById('tb-tabs').style.display=name==='find'?'flex':'none';
+  document.querySelectorAll('.ni').forEach(b=>{if(b.getAttribute('onclick')&&b.getAttribute('onclick').includes("'"+name+"'"))b.classList.add('active');});
+  document.querySelectorAll('.bn-item').forEach(b=>{if(b.getAttribute('onclick')&&b.getAttribute('onclick').includes("'"+name+"'"))b.classList.add('active');});
+  if(name==='find')setTimeout(()=>{if(map)map.invalidateSize();},100);
+}
+
+function setTab(i){document.querySelectorAll('.ttab').forEach((t,j)=>t.classList.toggle('active',i===j));}
+
+function setKyc(i){
+  document.querySelectorAll('.ks').forEach((k,j)=>{
+    k.classList.remove('done','cur');
+    if(j<i)k.classList.add('done');else if(j===i)k.classList.add('cur');
+    k.querySelector('.ks-c').textContent=j<i?'✓':j+1;
+  });
+}
+
+function openSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sbo').classList.add('show');}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sbo').classList.remove('show');}
+
+let chgOn=false,chgInt=null,kwh=0,soc=45,sec=0;
+function toggleChg(){
+  if(!chgOn){
+    chgOn=true;
+    document.getElementById('chg-btn').textContent='■ หยุดชาร์จ';
+    document.getElementById('chg-btn').className='btn-stop';
+    document.getElementById('sdot').classList.add('on');
+    document.getElementById('stxt').textContent='กำลังชาร์จ...';
+    chgInt=setInterval(()=>{
+      kwh+=.22;soc=Math.min(100,soc+.4);sec+=6;
+      const m=Math.floor(sec/60),s2=sec%60;
+      document.getElementById('kwh-d').innerHTML=kwh.toFixed(1)+'<span class="big-unit">kWh</span>';
+      document.getElementById('soc-d').textContent=Math.round(soc)+'%';
+      document.getElementById('time-d').textContent=(m<10?'0':'')+m+':'+(s2<10?'0':'')+s2;
+      document.getElementById('cost-d').textContent='฿'+Math.round(kwh*4.5);
+      document.getElementById('pf').style.width=Math.min(100,Math.round((soc-45)/55*100))+'%';
+      document.getElementById('pow-d').textContent='7.2 kW';
+      document.getElementById('rng-d').textContent=Math.round(kwh*5)+' กม.';
+      if(soc>=100){clearInterval(chgInt);chgOn=false;document.getElementById('stxt').textContent='ชาร์จเต็มแล้ว 100%';}
+    },600);
+  }else{
+    clearInterval(chgInt);chgOn=false;
+    document.getElementById('chg-btn').textContent='ชาร์จเสร็จสิ้น ✓';
+    document.getElementById('chg-btn').style.background='#64748B';
+    document.getElementById('sdot').classList.remove('on');
+    document.getElementById('stxt').textContent='ชาร์จเสร็จสิ้น';
+  }
+}
+
+window.addEventListener('load',()=>{initMap();goPage('find');});
+</script>
+</body>
+</html>
